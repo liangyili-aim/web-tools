@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import re
+
+def get_emails_from_user(prompt_name):
+    print(f"\n--- {prompt_name}を貼り付けてください (完了後Enterを押し、'END'で終了) ---")
+    email_set = set()
+    
+    while True:
+        try:
+            line = input()
+            if line.strip().upper() == 'END':
+                break
+            
+            parts = line.replace(',', ' ').replace(';', ' ').split()
+            
+            for part in parts:
+                clean_email = part.strip().lower()
+                if '@' in clean_email:
+                    email_set.add(clean_email)
+        except EOFError:
+            break
+            
+    print(f"-> {len(email_set)}件のユニークなメールを読み込みました。")
+    return email_set
+
+def main():
+    print("【メールリスト照合ツール】")
+    
+    group_list = get_emails_from_user("リスト1 (例：Google Groupメンバー)")
+    my_list = get_emails_from_user("リスト2 (手元のメールリスト)")
+    
+    # 交差：両方に存在（重複）
+    duplicates = my_list.intersection(group_list)
+    
+    # 差分：リスト2にあるがリスト1にない（新規）
+    new_emails = my_list.difference(group_list)
+    
+    print("\n" + "="*30)
+    print("照合結果レポート：")
+    print("="*30)
+    
+    if duplicates:
+        print(f"\n[!] {len(duplicates)}件の重複メールを発見（両方に存在）：")
+        print("-" * 20)
+        print(", ".join(sorted(duplicates)))
+    else:
+        print("\n[O] 重複メールはありませんでした。")
+
+    if new_emails:
+        print(f"\n[+] {len(new_emails)}件の新規メールを発見（リスト2のみ）：")
+        print("（グループに追加可能なリスト）")
+        print("-" * 20)
+        print(", ".join(sorted(new_emails)))
+    else:
+        print("\n[-] 手元のメールはすべてグループに存在しています。")
+
+if __name__ == "__main__":
+    main()

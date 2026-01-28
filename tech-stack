@@ -1,0 +1,68 @@
+テック スタック
+
+
+#### 1. コアフレームワーク (The Core)
+
+* フレームワーク: **Vue.js 3** (Composition API使用)
+
+
+* ビルドツール: Vite
+
+
+#### 2. UI インターフェース・スタイル (The Look)
+
+* CSSフレームワーク: Tailwind CSS
+
+
+* コンポーネントライブラリ: DaisyUI
+
+
+#### 3. ロジックライブラリ (The Logic - Python Modulesの置き換え)
+
+
+| Python標準ライブラリ | JavaScript代替 (NPMパッケージ) | 用途 |
+| --- | --- | --- |
+| ipaddress | ipaddr.js or ip-address | IPv4/IPv6 CIDRの解析、有効なIPアドレスの検証 |
+| secrets | window.crypto | Math.random()は使用しない。ブラウザ内蔵の `crypto.getRandomValues()` がPythonのsecretsに相当 |
+| re | RegExp | JS正規表現エンジンは非常に強力で、メール抽出と簡易検証に対応 |
+| csv | テンプレート文字列 + Blob | CSV生成に追加パッケージは不要。JS標準の文字列処理 + `URL.createObjectURL` でファイルダウンロード実装 |
+
+#### 4. ルーティング・デプロイ (Routing & Deploy)
+
+* ルーティング: Vue Router
+* 「メール照合」「IPチェック」「パスワード生成」の3つのページを切り替え
+
+
+* ホスティング: GitHub Pages
+* 自動化: GitHub Actions
+* シンプルな `.yml` ファイルで、`git push` 時に自動でビルド・デプロイ
+
+
+---
+
+### 📂 プロジェクト構造プレビュー
+
+プロジェクトフォルダの構成：
+
+```text
+my-web-tools/
+├── index.html
+├── package.json        (パッケージ管理設定)
+├── vite.config.js      (Vite設定ファイル)
+├── public/             (favicon, robots.txtなど)
+└── src/
+    ├── App.vue         (メインエントリーポイント)
+    ├── main.js
+    ├── router.js       (3つのツールのルート設定)
+    ├── assets/         (画像・共有CSS)
+    ├── components/     (共有コンポーネント：Header, Footerなど)
+    ├── utils/          (ユーティリティ関数)
+    │   ├── ipUtils.js  <-- 元ipchk.pyのロジック
+    │   └── pwdUtils.js <-- 元pwdgen.pyのロジック
+    └── views/          (ページ)
+        ├── Home.vue    (ホームダッシュボード)
+        ├── EmailChecker.vue  <-- emailchkのUI + ロジック
+        ├── IpChecker.vue     <-- ipchkのUI + ロジック
+        └── PwdGenerator.vue  <-- pwdgenのUI + ロジック
+
+```

@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Password Generator
+Features:
+- Contains at least 2 special characters
+- Configurable length (default 18, max 256)
+- Avoids ambiguous characters (such as 0/O, 1/l/I, etc.)
+- Batch generation
+- CSV export support
+"""
+
+import secrets
+import string
+import argparse
+import csv
+import sys
+from datetime import datetime
+
+
+class PasswordGenerator:
+    # Define character sets (removing ambiguous characters)
+    LOWERCASE = 'abcdefghjkmnpqrstuvwxyz'  # removed i, l, o
+    UPPERCASE = 'ABCDEFGHJKLMNPQRSTUVWXYZ'  # removed I, O
+    DIGITS = '23456789'  # removed 0, 1
+    SPECIAL = '!@#$%&*'  # easily recognizable special characters
+    
+    def __init__(self, length=18, min_special=2, use_special=True):
+        """
+        Initialize password generator
+        :param length: Password length
+        :param min_special: Minimum number of special characters
+        :param use_special: Whether to include special characters
+        """
+        if length < 6:
+            raise ValueError("Password length must be at least 6 characters")
+        if length > 256:
+            raise ValueError("Password length cannot exceed 256 characters")
+        if not use_special and min_special > 0:
+            min_special = 0  # Override min_special if special chars are disabled
+        if use_special and min_special > length - 3:
+            raise ValueError("Too many special characters required, need space for other character types")
+        
+        self.length = length
+        self.min_special = min_special
+        self.use_special = use_special
+        # Build character set based on whether special characters are enabled
+        if use_special:
+            self.all_chars = self.LOWERCASE + self.UPPERCASE + self.DIGITS + self.SPECIAL
+        else:
+            self.all_chars = self.LOWERCASE + self.UPPERCASE + self.DIGITS
+    
+    def generate(self):
+        """
+        Generate a password that meets requirements
+        Ensures at least: lowercase letter, uppercase letter, digit, and specified number of special characters (if enabled)
+        """
+        while True:
+            password = []
+            
+            # Ensure minimum number of special characters (if enabled)
+            if self.use_special:
+                for _ in range(self.min_special):
+                    password.append(secrets.choice(self.SPECIAL))
+            
+            # Ensure at least one lowercase letter
+            password.append(secrets.choice(self.LOWERCASE))
+            
+            # Ensure at least one uppercase letter
+            password.append(secrets.choice(self.UPPERCASE))
+            
+            # Ensure at least one digit
+            password.append(secrets.choice(self.DIGITS))
+            
+            # Fill remaining length
+            remaining_length = self.length - len(password)
+            for _ in range(remaining_length):
+                password.append(secrets.choice(self.all_chars))
+            
+            # Shuffle randomly
+            secrets.SystemRandom().shuffle(password)
+            
+            # Validate requirements
+            password_str = ''.join(password)
+            if self._validate_password(password_str):
+                return password_str
+    
+    def _validate_password(self, password):
+        """Validate if password meets all requirements"""
+        has_lower = any(c in self.LOWERCASE for c in password)
+        has_upper = any(c in self.UPPERCASE for c in password)
+        has_digit = any(c in self.DIGITS for c in password)
+        special_count = sum(1 for c in password if c in self.SPECIAL)
+        
+        # If special characters are required, check the count
+        if self.use_special:
+            return (has_lower and has_upper and has_digit and 
+                    special_count >= self.min_special)
+        else:
+            # If special characters are disabled, ensure none are present
+            return (has_lower and has_upper and has_digit and 
+                    special_count == 0)
+    
+    def generate_batch(self, count):
+        """
+        Generate passwords in batch
+        :param count: Number of passwords to generate
+        :return: List of passwords
+        """
+        return [self.generate() for _ in range(count)]
+
+
+def save_to_csv(passwords, filename):
+    """
+    Save passwords to CSV file
+    :param passwords: List of passwords
+    :param filename: Output filename
+    """
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['No.', 'Password', 'Generated Time'])
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        for idx, pwd in enumerate(passwords, 1):
+            writer.writerow([idx, pwd, timestamp])
+    print(f"✓ Passwords saved to: {filename}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Secure Password Generator',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Usage Examples:
+  %(prog)s                          # Generate 1 password with default length (18)
+  %(prog)s -l 24                    # Generate 1 password with 24 characters
+  %(prog)s -n 10                    # Generate 10 passwords
+  %(prog)s -n 5 -l 32 -o pwd.csv   # Generate 5 passwords of 32 characters and save to CSV
+  %(prog)s -n 3 -s 3                # Generate 3 passwords with at least 3 special characters
+  %(prog)s --no-special             # Generate password without special characters
+  %(prog)s -n 5 --no-special        # Generate 5 passwords without special characters
+        """
+    )
+    
+    parser.add_argument('-l', '--length', type=int, default=18,
+                        help='Password length (default: 18, max: 256)')
+    parser.add_argument('-n', '--number', type=int, default=1,
+                        help='Number of passwords to generate (default: 1)')
+    parser.add_argument('-s', '--special', type=int, default=2,
+                        help='Minimum number of special characters (default: 2)')
+    parser.add_argument('--no-special', action='store_true',
+                        help='Exclude special characters from password')
+    parser.add_argument('-o', '--output', type=str,
+                        help='Output CSV filename (e.g., passwords.csv)')
+    
+    args = parser.parse_args()
+    
+    try:
+        # Create password generator
+        use_special = not args.no_special
+        min_special = 0 if args.no_special else args.special
+        generator = PasswordGenerator(length=args.length, min_special=min_special, use_special=use_special)
+        
+        # Generate passwords
+        special_info = "without special characters" if args.no_special else f"with at least {min_special} special character(s)"
+        print(f"Generating {args.number} password(s) with length {args.length} {special_info}...")
+        passwords = generator.generate_batch(args.number)
+        
+        # Display passwords
+        print("\nGenerated Passwords:")
+        print("=" * 60)
+        for idx, pwd in enumerate(passwords, 1):
+            print(f"{idx:3d}. {pwd}")
+        print("=" * 60)
+        
+        # Save to CSV if output file specified
+        if args.output:
+            save_to_csv(passwords, args.output)
+        
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
+    

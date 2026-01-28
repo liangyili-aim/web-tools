@@ -1,0 +1,282 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import ipaddress
+import re
+import sys
+
+def extract_and_check_ips(text_block):
+    """
+    テキストブロックから全てのIP/CIDR形式の文字列を抽出し、無効な部分を無視して重複をチェックします。
+
+    Args:
+        text_block: IPアドレスを含む任意のテキストブロック。
+
+    Returns:
+        タプル (overlapping_pairs, valid_networks, invalid_strings)
+        - overlapping_pairs: 重複しているIPオブジェクトのタプルのリスト。
+        - valid_networks: 正常に解析されたIPオブジェクトのリスト。
+        - invalid_strings: IPのように見えるが検証に失敗した文字列のリスト。
+    """
+    if not text_block:
+        return ([], [], [])
+
+    # 1. インテリジェント抽出：正規表現を使用して、IP/CIDR形式に一致する全ての文字列を検索します。
+    #    このパターンは xxx.xxx.xxx.xxx/xx のような形式を検出します。
+    ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b'
+    candidate_ips = re.findall(ip_pattern, text_block)
+
+    valid_networks = []
+    invalid_strings = []
+
+    # 2. 抽出された各文字列を検証します。
+    for ip_str in candidate_ips:
+        try:
+            # 文字列を有効なIPネットワークオブジェクトに変換しようと試みます。
+            # strict=False は /31 のような特殊なネットワーク指定を許可します。
+            network = ipaddress.ip_network(ip_str, strict=False)
+            valid_networks.append(network)
+        except ValueError:
+            # 変換に失敗した場合（例: 300.10.10.10）、無効な文字列として記録します。
+            invalid_strings.append(ip_str)
+
+    # 有効なネットワークをソートします。
+    valid_networks.sort()
+
+    overlapping_pairs = []
+    # 有効なネットワーク間でのみ重複をチェックします。
+    if len(valid_networks) >= 2:
+        for i in range(len(valid_networks)):
+            for j in range(i + 1, len(valid_networks)):
+                if valid_networks[i].overlaps(valid_networks[j]):
+                    overlapping_pairs.append((valid_networks[i], valid_networks[j]))
+
+    return (overlapping_pairs, valid_networks, invalid_strings)
+
+def compare_ip_sets(networks1, networks2):
+    """
+    二つのIPネットワークセットを比較して、一致・不一致・追加・削除された項目を分析します。
+    
+    Args:
+        networks1: 最初のIPネットワークのリスト
+        networks2: 二番目のIPネットワークのリスト
+    
+    Returns:
+        辞書形式の比較結果
+    """
+    set1 = set(networks1)
+    set2 = set(networks2)
+    
+    common = set1 & set2  # 共通のIP
+    only_in_first = set1 - set2  # 最初の入力にのみ存在
+    only_in_second = set2 - set1  # 二番目の入力にのみ存在
+    
+    return {
+        'identical': len(set1) == len(set2) and set1 == set2,
+        'common': sorted(list(common)),
+        'only_in_first': sorted(list(only_in_first)),
+        'only_in_second': sorted(list(only_in_second)),
+        'total_first': len(networks1),
+        'total_second': len(networks2)
+    }
+
+def main():
+    """
+    ユーザーとの対話を実行するメイン関数。
+    """
+    # 日本語が正しく表示されるように標準出力のエンコーディングを設定します。
+    if sys.platform == "win32":
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdin.reconfigure(encoding='utf-8')
+
+    print("=============================================")
+    print("      IPアドレス抽出・重複・比較チェックツール")
+    print("=============================================")
+    print("使い方：")
+    print("1. IPアドレスを含むテキストをそのまま貼り付けてください。")
+    print("   (スクリプトが自動的にIP/CIDRを検出し、他の内容は無視します)")
+    print("2. 貼り付け後、Enterキーを2回押してチェックを開始します。")
+    print("3. 比較モードでは、二回の入力が要求されます。")
+    print("4. 終了するには、何も入力せずにEnterキーを押すか、「exit」と入力してください。")
+    print("-" * 45)
+    
+    # 操作モードの選択
+    print("操作モードを選択してください：")
+    print("1. 単一入力モード（重複チェックのみ）")
+    print("2. 比較モード（二つの入力を比較）")
+    
+    while True:
+        mode_input = input("モードを選択 (1 または 2): ").strip()
+        if mode_input == '1':
+            single_input_mode()
+            break
+        elif mode_input == '2':
+            comparison_mode()
+            break
+        elif mode_input.lower() in ['exit', 'quit', 'q']:
+            print("\nご利用ありがとうございました。プログラムを終了します。")
+            return
+        else:
+            print("無効な選択です。1 または 2 を入力してください。")
+
+def single_input_mode():
+    """
+    単一入力モード：従来の重複チェック機能
+    """
+    print("\n=== 単一入力モード ===")
+    print("-" * 45)
+
+    while True:
+        try:
+            print("チェックしたいテキストを貼り付けてください (貼り付け後、Enterを2回押して入力を確定します):")
+            # ユーザーが複数行のテキストを貼り付けられるようにします。
+            lines = []
+            while True:
+                line = input()
+                if not line:
+                    break
+                lines.append(line)
+            user_input = "\n".join(lines)
+
+            if user_input.lower() in ['exit', 'quit', 'q', '']:
+                print("\nご利用ありがとうございました。プログラムを終了します。")
+                break
+
+            # 抽出とチェックを実行します。
+            overlaps, valids, invalids = extract_and_check_ips(user_input)
+
+            print("-" * 45)
+            # 1. 無視された無効なIPについて報告します。
+            if invalids:
+                print(f"🟡 以下の{len(invalids)}個の無効なIPは無視されました：")
+                for item in invalids:
+                    print(f"  - {item}")
+            
+            # 2. 有効なIPのチェック結果を報告します。
+            if not valids:
+                 print("❌ 入力から有効なIPアドレスが見つかりませんでした。")
+            else:
+                print(f"ℹ️ {len(valids)}個の有効なIP範囲の抽出と分析に成功しました。")
+                if not overlaps:
+                    print("✅ 有効なIP範囲内で重複は見つかりませんでした。")
+                else:
+                    print(f"⚠️ 警告！{len(overlaps)}個の重複するIP範囲が見つかりました：")
+                    for i, pair in enumerate(overlaps, 1):
+                        print(f"  {i}. {str(pair[0])} と {str(pair[1])} が重複しています")
+
+            print("-" * 45 + "\n")
+
+        except KeyboardInterrupt:
+            # Ctrl+C が押された場合の処理
+            print("\n\n処理が中断されました。ご利用ありがとうございました。プログラムを終了します。")
+            break
+
+def comparison_mode():
+    """
+    比較モード：二つの入力を比較
+    """
+    print("\n=== 比較モード ===")
+    print("二つのIP設定を入力して比較します。")
+    print("-" * 45)
+
+    while True:
+        try:
+            # 最初の入力
+            print("【最初の入力】IPアドレスを含むテキストを貼り付けてください:")
+            print("(貼り付け後、Enterを2回押して入力を確定します)")
+            lines1 = []
+            while True:
+                line = input()
+                if not line:
+                    break
+                lines1.append(line)
+            input1 = "\n".join(lines1)
+
+            if input1.lower() in ['exit', 'quit', 'q', '']:
+                print("\nご利用ありがとうございました。プログラムを終了します。")
+                break
+
+            # 二番目の入力
+            print("\n【二番目の入力】比較したいIPアドレスを含むテキストを貼り付けてください:")
+            print("(貼り付け後、Enterを2回押して入力を確定します)")
+            lines2 = []
+            while True:
+                line = input()
+                if not line:
+                    break
+                lines2.append(line)
+            input2 = "\n".join(lines2)
+
+            if input2.lower() in ['exit', 'quit', 'q', '']:
+                print("\nご利用ありがとうございました。プログラムを終了します。")
+                break
+
+            # 両方の入力を解析
+            overlaps1, valids1, invalids1 = extract_and_check_ips(input1)
+            overlaps2, valids2, invalids2 = extract_and_check_ips(input2)
+
+            print("=" * 45)
+            print("             解析結果")
+            print("=" * 45)
+
+            # 最初の入力の結果
+            print("【最初の入力の解析結果】")
+            if invalids1:
+                print(f"🟡 {len(invalids1)}個の無効なIPは無視されました：{', '.join(invalids1)}")
+            if not valids1:
+                print("❌ 有効なIPアドレスが見つかりませんでした。")
+            else:
+                print(f"ℹ️ {len(valids1)}個の有効なIP範囲を検出しました。")
+                if overlaps1:
+                    print(f"⚠️ {len(overlaps1)}個の重複するIP範囲があります。")
+
+            print()
+
+            # 二番目の入力の結果
+            print("【二番目の入力の解析結果】")
+            if invalids2:
+                print(f"🟡 {len(invalids2)}個の無効なIPは無視されました：{', '.join(invalids2)}")
+            if not valids2:
+                print("❌ 有効なIPアドレスが見つかりませんでした。")
+            else:
+                print(f"ℹ️ {len(valids2)}個の有効なIP範囲を検出しました。")
+                if overlaps2:
+                    print(f"⚠️ {len(overlaps2)}個の重複するIP範囲があります。")
+
+            print()
+
+            # 比較結果
+            if valids1 or valids2:
+                comparison = compare_ip_sets(valids1, valids2)
+                print("【比較結果】")
+                if comparison['identical']:
+                    print("✅ 二つの入力のIPアドレス設定は完全に一致しています！")
+                else:
+                    print("⚠️ 二つの入力のIPアドレス設定に違いがあります：")
+                    
+                    if comparison['common']:
+                        print(f"  📊 共通のIP範囲 ({len(comparison['common'])}個):")
+                        for ip in comparison['common']:
+                            print(f"    - {ip}")
+                    
+                    if comparison['only_in_first']:
+                        print(f"  🔴 最初の入力にのみ存在 ({len(comparison['only_in_first'])}個):")
+                        for ip in comparison['only_in_first']:
+                            print(f"    - {ip}")
+                    
+                    if comparison['only_in_second']:
+                        print(f"  🔵 二番目の入力にのみ存在 ({len(comparison['only_in_second'])}個):")
+                        for ip in comparison['only_in_second']:
+                            print(f"    - {ip}")
+                
+                print(f"  📈 統計: 最初={comparison['total_first']}個, 二番目={comparison['total_second']}個")
+
+            print("-" * 45 + "\n")
+
+        except KeyboardInterrupt:
+            # Ctrl+C が押された場合の処理
+            print("\n\n処理が中断されました。ご利用ありがとうございました。プログラムを終了します。")
+            break
+
+if __name__ == "__main__":
+    main()
