@@ -47,6 +47,11 @@ GitHub Actions による自動デプロイを設定済み：
 
 すべてのデータ処理はブラウザ内で完結し、サーバーにアップロードされることはありません。
 
+## ローカルCLI
+- pythonインストール済み
+- 'ipchk','pwdgen','emailchk'を'/usr/local/bin'にコピー
+- teminalで実行できるようになる
+
 ## ライセンス
 
 MIT License
