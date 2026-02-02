@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Redirecting...</title>
+    <script>
+      // GitHub Pages SPA redirect script
+      // Converts path to query string and redirects to index.html
+      // Then index.html will restore the original path
+      const pathSegmentsToKeep = 1; // Keep '/web-tools' base path
+      const location = window.location;
+      const l = location.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?p=' +
+        encodeURIComponent(
+          location.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/') +
+          location.search + location.hash
+        );
+      location.replace(l);
+    </script>
+  </head>
+  <body>
+    リダイレクト中...
+  </body>
+</html>
