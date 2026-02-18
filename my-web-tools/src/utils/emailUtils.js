@@ -3,6 +3,25 @@
  */
 
 /**
+ * Convert fullwidth characters to halfwidth equivalents
+ * e.g. ＠ → @, ．→ ., ａ → a, Ａ → A, ＿ → _, etc.
+ */
+export function fullwidthToHalfwidth(text) {
+  if (!text) return text
+  return text.replace(/[\uff01-\uff5e]/g, (ch) => {
+    return String.fromCharCode(ch.charCodeAt(0) - 0xfee0)
+  })
+}
+
+/**
+ * Normalize email text: convert fullwidth to halfwidth, then lowercase
+ */
+export function normalizeEmailText(text) {
+  if (!text) return text
+  return fullwidthToHalfwidth(text).toLowerCase()
+}
+
+/**
  * Extract emails from text (simple method)
  */
 export function extractEmails(text) {
@@ -10,7 +29,10 @@ export function extractEmails(text) {
     return new Set()
   }
 
-  const parts = text
+  // Normalize: fullwidth → halfwidth, uppercase → lowercase
+  const normalized = normalizeEmailText(text)
+
+  const parts = normalized
     .replace(/,/g, ' ')
     .replace(/;/g, ' ')
     .split(/\s+/)
@@ -38,8 +60,11 @@ export function extractEmailsRegex(text) {
     return new Set()
   }
 
+  // Normalize: fullwidth → halfwidth, uppercase → lowercase
+  const normalized = normalizeEmailText(text)
+
   const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g
-  const matches = text.match(emailPattern) || []
+  const matches = normalized.match(emailPattern) || []
 
   return new Set(matches.map(email => email.toLowerCase()))
 }
