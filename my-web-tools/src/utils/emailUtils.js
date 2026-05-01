@@ -18,7 +18,11 @@ export function fullwidthToHalfwidth(text) {
  */
 export function normalizeEmailText(text) {
   if (!text) return text
-  return fullwidthToHalfwidth(text).toLowerCase()
+  const normalized = text.normalize('NFKC')
+  const halfwidth = fullwidthToHalfwidth(normalized)
+  // Remove invisible chars that can break duplicate matching.
+  const cleaned = halfwidth.replace(/[\u200B-\u200D\uFEFF]/g, '')
+  return cleaned.toLowerCase()
 }
 
 /**
