@@ -1,5 +1,31 @@
 #!/usr/bin/env python3
 import re
+import unicodedata
+
+
+def fullwidth_to_halfwidth(text):
+    if not text:
+        return text
+    return ''.join(
+        chr(ord(ch) - 0xFEE0) if '\uFF01' <= ch <= '\uFF5E' else ch
+        for ch in text
+    )
+
+
+def normalize_email_text(text):
+    if not text:
+        return text
+    # Normalize compatibility characters and remove invisible separators.
+    normalized = unicodedata.normalize('NFKC', text)
+    normalized = fullwidth_to_halfwidth(normalized)
+    normalized = re.sub(r'[\u200B\u200C\u200D\uFEFF]', '', normalized)
+    return normalized.lower()
+
+
+def extract_emails(text):
+    normalized = normalize_email_text(text)
+    email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+    return re.findall(email_pattern, normalized)
 
 def get_emails_from_user(prompt_name):
     print(f"\n--- {prompt_name}を貼り付けてください (完了後Enterを押し、'END'で終了) ---")
@@ -10,13 +36,9 @@ def get_emails_from_user(prompt_name):
             line = input()
             if line.strip().upper() == 'END':
                 break
-            
-            parts = line.replace(',', ' ').replace(';', ' ').split()
-            
-            for part in parts:
-                clean_email = part.strip().lower()
-                if '@' in clean_email:
-                    email_set.add(clean_email)
+
+            for email in extract_emails(line):
+                email_set.add(email)
         except EOFError:
             break
             
