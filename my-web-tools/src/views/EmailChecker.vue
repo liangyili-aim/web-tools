@@ -123,6 +123,11 @@
         </div>
       </div>
 
+      <!-- No Duplicates Message -->
+      <div v-if="result.duplicates.length === 0" class="alert alert-info">
+        <span>ℹ️ 重複するメールはありませんでした</span>
+      </div>
+
       <!-- Only in List 1 -->
       <div v-if="result.notInList2.length > 0" class="collapse collapse-arrow bg-base-200">
         <input type="checkbox" />
@@ -139,8 +144,8 @@
         </div>
       </div>
 
-      <!-- No Duplicates Message -->
-      <div v-if="result.duplicates.length === 0 && result.newEmails.length === 0" class="alert alert-success">
+      <!-- Identical Lists Message -->
+      <div v-if="result.duplicates.length > 0 && result.newEmails.length === 0 && result.notInList2.length === 0" class="alert alert-success">
         <span>✅ 2つのリストは完全に一致しています！</span>
       </div>
     </div>

@@ -87,51 +87,55 @@
     <div v-if="result" class="mt-8 space-y-6">
       <div class="divider">チェック結果</div>
 
-      <!-- Invalid IPs Warning -->
-      <div v-if="result.invalidStrings && result.invalidStrings.length > 0" class="alert alert-warning">
-        <span>🟡 以下の {{ result.invalidStrings.length }} 件の無効なIPは無視されました：</span>
-        <code class="ml-2">{{ result.invalidStrings.join(', ') }}</code>
-      </div>
+      <template v-for="(section, sIndex) in resultSections" :key="sIndex">
+        <h3 v-if="section.label" class="font-semibold">{{ section.label }}</h3>
 
-      <!-- Valid IPs Count -->
-      <div v-if="result.validNetworks" class="alert alert-info">
-        <span>ℹ️ {{ result.validNetworks.length }} 件の有効なIP/CIDRを抽出しました</span>
-      </div>
-
-      <!-- No Valid IPs -->
-      <div v-if="result.validNetworks && result.validNetworks.length === 0" class="alert alert-error">
-        <span>❌ 有効なIPアドレスが見つかりませんでした</span>
-      </div>
-
-      <!-- Overlapping Check -->
-      <div v-if="result.overlappingPairs">
-        <div v-if="result.overlappingPairs.length === 0" class="alert alert-success">
-          <span>✅ 重複するIP範囲はありませんでした</span>
+        <!-- Invalid IPs Warning -->
+        <div v-if="section.invalidStrings.length > 0" class="alert alert-warning">
+          <span>🟡 以下の {{ section.invalidStrings.length }} 件の無効なIPは無視されました：</span>
+          <code class="ml-2">{{ section.invalidStrings.join(', ') }}</code>
         </div>
-        <div v-else class="alert alert-warning shadow-lg">
-          <div>
-            <span>⚠️ {{ result.overlappingPairs.length }} 組の重複するIP範囲が見つかりました：</span>
-            <ul class="list-disc list-inside mt-2">
-              <li v-for="(pair, index) in result.overlappingPairs" :key="index">
-                <code>{{ pair[0] }}</code> と <code>{{ pair[1] }}</code> が重複
-              </li>
-            </ul>
+
+        <!-- No Valid IPs -->
+        <div v-if="section.validNetworks.length === 0" class="alert alert-error">
+          <span>❌ 有効なIPアドレスが見つかりませんでした</span>
+        </div>
+
+        <template v-else>
+          <!-- Valid IPs Count -->
+          <div class="alert alert-info">
+            <span>ℹ️ {{ section.validNetworks.length }} 件の有効なIP/CIDRを抽出しました</span>
           </div>
-        </div>
-      </div>
 
-      <!-- Valid Networks List -->
-      <div v-if="result.validNetworks && result.validNetworks.length > 0" class="collapse collapse-arrow bg-base-200">
-        <input type="checkbox" />
-        <div class="collapse-title font-medium">
-          📋 有効なIP/CIDRリスト（{{ result.validNetworks.length }} 件）
-        </div>
-        <div class="collapse-content">
-          <div class="result-box">
-            <p v-for="net in result.validNetworks" :key="net.original">{{ net.original }}</p>
+          <!-- Overlapping Check -->
+          <div v-if="section.overlappingPairs.length === 0" class="alert alert-success">
+            <span>✅ 重複するIP範囲はありませんでした</span>
           </div>
-        </div>
-      </div>
+          <div v-else class="alert alert-warning shadow-lg">
+            <div>
+              <span>⚠️ {{ section.overlappingPairs.length }} 組の重複するIP範囲が見つかりました：</span>
+              <ul class="list-disc list-inside mt-2">
+                <li v-for="(pair, index) in section.overlappingPairs" :key="index">
+                  <code>{{ pair[0] }}</code> と <code>{{ pair[1] }}</code> が重複
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Valid Networks List -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              📋 有効なIP/CIDRリスト（{{ section.validNetworks.length }} 件）
+            </div>
+            <div class="collapse-content">
+              <div class="result-box">
+                <p v-for="(net, index) in section.validNetworks" :key="index">{{ net.original }}</p>
+              </div>
+            </div>
+          </div>
+        </template>
+      </template>
 
       <!-- Comparison Results -->
       <div v-if="result.comparison" class="space-y-4">
@@ -202,13 +206,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { extractAndCheckIps, compareIpSets } from '../utils/ipUtils'
 
 const mode = ref('single')
 const input1 = ref('')
 const input2 = ref('')
 const result = ref(null)
+
+// One section per analysed input (two in compare mode)
+const resultSections = computed(() => {
+  if (!result.value) return []
+  if (result.value.result2) {
+    return [
+      { label: '【IP設定1】', ...result.value },
+      { label: '【IP設定2】', ...result.value.result2 }
+    ]
+  }
+  return [{ label: '', ...result.value }]
+})
+
+// Results belong to the mode they were produced in
+watch(mode, () => {
+  result.value = null
+})
 
 function checkSingle() {
   const checkResult = extractAndCheckIps(input1.value)
