@@ -23,7 +23,7 @@ def extract_and_check_ips(text_block):
 
     # 1. インテリジェント抽出：正規表現を使用して、IP/CIDR形式に一致する全ての文字列を検索します。
     #    このパターンは xxx.xxx.xxx.xxx/xx のような形式を検出します。
-    ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d{1,2})?\b'
+    ip_pattern = r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:\/\d+)?\b'
     candidate_ips = re.findall(ip_pattern, text_block)
 
     valid_networks = []
@@ -106,7 +106,11 @@ def main():
     print("2. 比較モード（二つの入力を比較）")
     
     while True:
-        mode_input = input("モードを選択 (1 または 2): ").strip()
+        try:
+            mode_input = input("モードを選択 (1 または 2): ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nご利用ありがとうございました。プログラムを終了します。")
+            return
         if mode_input == '1':
             single_input_mode()
             break
@@ -166,8 +170,8 @@ def single_input_mode():
 
             print("-" * 45 + "\n")
 
-        except KeyboardInterrupt:
-            # Ctrl+C が押された場合の処理
+        except (KeyboardInterrupt, EOFError):
+            # Ctrl+C / Ctrl+D (EOF) が押された場合の処理
             print("\n\n処理が中断されました。ご利用ありがとうございました。プログラムを終了します。")
             break
 
@@ -273,8 +277,8 @@ def comparison_mode():
 
             print("-" * 45 + "\n")
 
-        except KeyboardInterrupt:
-            # Ctrl+C が押された場合の処理
+        except (KeyboardInterrupt, EOFError):
+            # Ctrl+C / Ctrl+D (EOF) が押された場合の処理
             print("\n\n処理が中断されました。ご利用ありがとうございました。プログラムを終了します。")
             break
 

@@ -10,12 +10,24 @@ const DIGITS = '23456789'  // removed: 0, 1
 const SPECIAL = '!@#$%&*'
 
 /**
+ * Uniform random integer in [0, max) using crypto API.
+ * Uses rejection sampling so the result has no modulo bias.
+ */
+function secureRandomInt(max) {
+  const range = 0x100000000 // 2^32
+  const limit = range - (range % max)
+  const array = new Uint32Array(1)
+  do {
+    crypto.getRandomValues(array)
+  } while (array[0] >= limit)
+  return array[0] % max
+}
+
+/**
  * Secure random character selection using crypto API
  */
 function secureRandomChoice(chars) {
-  const array = new Uint32Array(1)
-  crypto.getRandomValues(array)
-  return chars[array[0] % chars.length]
+  return chars[secureRandomInt(chars.length)]
 }
 
 /**
@@ -24,9 +36,7 @@ function secureRandomChoice(chars) {
 function secureShuffleArray(array) {
   const result = [...array]
   for (let i = result.length - 1; i > 0; i--) {
-    const randomArray = new Uint32Array(1)
-    crypto.getRandomValues(randomArray)
-    const j = randomArray[0] % (i + 1);
+    const j = secureRandomInt(i + 1);
     [result[i], result[j]] = [result[j], result[i]]
   }
   return result
@@ -60,6 +70,9 @@ export function generatePassword(options = {}) {
     useSpecial = true
   } = options
 
+  if (!Number.isInteger(length) || !Number.isInteger(minSpecial)) {
+    throw new Error('Length and special character count must be integers')
+  }
   if (length < 6) {
     throw new Error('Password must be at least 6 characters')
   }
@@ -68,6 +81,9 @@ export function generatePassword(options = {}) {
   }
 
   const actualMinSpecial = useSpecial ? minSpecial : 0
+  if (actualMinSpecial < 0) {
+    throw new Error('Minimum number of special characters cannot be negative')
+  }
   if (useSpecial && actualMinSpecial > length - 3) {
     throw new Error('Too many special characters required')
   }
@@ -120,7 +136,12 @@ export function generateBatch(count, options = {}) {
  * Download passwords as CSV file
  */
 export function downloadAsCsv(passwords, filename = 'passwords.csv') {
-  const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  // Local time, matching the Python CLI (toISOString() would give UTC)
+  const now = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  const timestamp =
+    `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
   
   let csvContent = 'No.,Password,Generated Time\n'
   passwords.forEach((pwd, idx) => {

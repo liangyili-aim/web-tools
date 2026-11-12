@@ -13,6 +13,7 @@ import secrets
 import string
 import argparse
 import csv
+import os
 import sys
 from datetime import datetime
 
@@ -35,8 +36,10 @@ class PasswordGenerator:
             raise ValueError("Password length must be at least 6 characters")
         if length > 256:
             raise ValueError("Password length cannot exceed 256 characters")
-        if not use_special and min_special > 0:
+        if not use_special:
             min_special = 0  # Override min_special if special chars are disabled
+        if min_special < 0:
+            raise ValueError("Minimum number of special characters cannot be negative")
         if use_special and min_special > length - 3:
             raise ValueError("Too many special characters required, need space for other character types")
         
@@ -115,7 +118,14 @@ def save_to_csv(passwords, filename):
     :param passwords: List of passwords
     :param filename: Output filename
     """
-    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+    # Passwords are secrets: create the file readable/writable by the owner only,
+    # and tighten permissions if the file already existed.
+    fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.chmod(filename, 0o600)
+    except OSError:
+        pass
+    with os.fdopen(fd, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['No.', 'Password', 'Generated Time'])
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -153,6 +163,9 @@ Usage Examples:
     
     args = parser.parse_args()
     
+    if args.number < 1:
+        parser.error("number of passwords must be at least 1")
+
     try:
         # Create password generator
         use_special = not args.no_special

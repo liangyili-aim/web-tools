@@ -78,10 +78,14 @@
               type="range" 
               v-model.number="minSpecial" 
               min="1" 
-              max="5" 
+              :max="maxMinSpecial" 
               class="range range-accent"
             />
           </div>
+        </div>
+
+        <div v-if="errorMessage" class="alert alert-error mt-4">
+          <span>❌ {{ errorMessage }}</span>
         </div>
 
         <div class="card-actions justify-center mt-6">
@@ -127,7 +131,7 @@
                   <div class="flex items-center gap-2">
                     <progress 
                       class="progress w-20" 
-                      :class="`progress-${pwd.strength.color}`"
+                      :class="STRENGTH_CLASSES[pwd.strength.level]"
                       :value="pwd.strength.score" 
                       :max="pwd.strength.maxScore"
                     ></progress>
@@ -162,7 +166,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { generatePassword, calculateStrength, downloadAsCsv } from '../utils/pwdUtils'
 
 const length = ref(18)
@@ -170,20 +174,44 @@ const count = ref(5)
 const useSpecial = ref(true)
 const minSpecial = ref(2)
 const passwords = ref([])
+const errorMessage = ref('')
+
+// Full class names so Tailwind/DaisyUI keeps them in the production build
+// (dynamically concatenated class names are purged).
+const STRENGTH_CLASSES = {
+  strong: 'progress-success',
+  medium: 'progress-warning',
+  weak: 'progress-error'
+}
+
+// A password needs room for one lowercase, one uppercase and one digit,
+// so at most (length - 3) special characters can be required.
+const maxMinSpecial = computed(() => Math.max(1, Math.min(5, length.value - 3)))
+
+watch(maxMinSpecial, (max) => {
+  if (minSpecial.value > max) minSpecial.value = max
+})
 
 function generate() {
-  passwords.value = []
-  
-  for (let i = 0; i < count.value; i++) {
-    const pwd = generatePassword({
-      length: length.value,
-      minSpecial: minSpecial.value,
-      useSpecial: useSpecial.value
-    })
-    passwords.value.push({
-      password: pwd,
-      strength: calculateStrength(pwd)
-    })
+  errorMessage.value = ''
+  const generated = []
+
+  try {
+    for (let i = 0; i < count.value; i++) {
+      const pwd = generatePassword({
+        length: length.value,
+        minSpecial: minSpecial.value,
+        useSpecial: useSpecial.value
+      })
+      generated.push({
+        password: pwd,
+        strength: calculateStrength(pwd)
+      })
+    }
+    passwords.value = generated
+  } catch (e) {
+    passwords.value = []
+    errorMessage.value = 'パスワードを生成できませんでした。設定を確認してください。'
   }
 }
 
